@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { ReportComponent } from './report.component';
+import { HighchartsChartModule } from "highcharts-angular";
 
 describe('ReportComponent', () => {
   let component: ReportComponent;
@@ -8,7 +9,8 @@ describe('ReportComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [ReportComponent]
+      declarations: [ReportComponent],
+      imports: [HighchartsChartModule]
     });
     fixture = TestBed.createComponent(ReportComponent);
     component = fixture.componentInstance;
