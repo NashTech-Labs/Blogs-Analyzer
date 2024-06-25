@@ -1,9 +1,11 @@
 package com.nashtech.blogs.analyzer.controller;
 
+import com.nashtech.blogs.analyzer.exception.PostNotFoundException;
 import com.nashtech.blogs.analyzer.model.Post;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -26,12 +28,16 @@ public class WordPressController {
     @Autowired
     private RestTemplate restTemplate;
 
-    private final String WORDPRESS_API_BASE_URL = "https://blog.nashtechglobal.com/wp-json/wp/v2/";
+    @Value("${wordpress.api.base-url}")
+    private String WORDPRESS_API_BASE_URL;
 
     @GetMapping("/posts/{id}")
     public ResponseEntity<String> getPostById(@PathVariable Long id) {
         String url = WORDPRESS_API_BASE_URL + "posts/" + id;
         String response = restTemplate.getForObject(url, String.class);
+        if (response == null || response.isEmpty()) {
+            throw new PostNotFoundException("Post with ID " + id + " not found");
+        }
 
         JSONObject jsonResponse = new JSONObject(response);
         String content = jsonResponse.getJSONObject("content").getString("rendered");
@@ -44,6 +50,9 @@ public class WordPressController {
         String url = WORDPRESS_API_BASE_URL + "posts?search=" + search;
         String response = restTemplate.getForObject(url, String.class);
         JSONArray postsArray = new JSONArray(response);
+        if (postsArray.isEmpty()) {
+            throw new PostNotFoundException("No posts found with the search term: " + search);
+        }
         StringBuilder renderedContent = new StringBuilder();
 
         for (int i = 0; i < postsArray.length(); i++) {
@@ -60,6 +69,9 @@ public class WordPressController {
         String url = WORDPRESS_API_BASE_URL + "posts?search=" + title + "&searchFields=title";
         String response = restTemplate.getForObject(url, String.class);
         JSONArray postsArray = new JSONArray(response);
+        if (postsArray.isEmpty()) {
+            throw new PostNotFoundException("No posts found with the title: " + title);
+        }
         StringBuilder renderedContent = new StringBuilder();
 
         for (int i = 0; i < postsArray.length(); i++) {
@@ -79,6 +91,7 @@ public class WordPressController {
 
         int page = 1;
         int totalPages = 1;
+        boolean postFound = false;
 
         StringBuilder renderedContent = new StringBuilder();
 
@@ -92,6 +105,7 @@ public class WordPressController {
             }
 
             for (int i = 0; i < postsArray.length(); i++) {
+                postFound = true;
                 JSONObject post = postsArray.getJSONObject(i);
                 String postId = post.get("id").toString();
                 String title = post.getJSONObject("title").getString("rendered");
@@ -103,7 +117,9 @@ public class WordPressController {
             }
             page++;
         }
-
+        if (!postFound) {
+            throw new PostNotFoundException("No posts found for author ID: " + authorId);
+        }
         return ResponseEntity.ok(renderedContent.toString());
     }
 
@@ -123,9 +139,12 @@ public class WordPressController {
         );
 
         List<Map<String, Object>> postMaps = response.getBody();
+        if (postMaps == null || postMaps.isEmpty()) {
+            throw new PostNotFoundException("No posts found for the given page: " + page);
+        }
         List<Post> posts = new ArrayList<>();
 
-        if (postMaps != null) {
+
             for (Map<String, Object> postMap : postMaps) {
                 Post post = new Post();
                 post.setId(((Number) postMap.get("id")).longValue());
@@ -145,7 +164,7 @@ public class WordPressController {
             }
 
             fetchAuthorNames(posts);
-        }
+
 
         HttpHeaders headers = response.getHeaders();
         int totalPosts = Integer.parseInt(Objects.requireNonNull(headers.getFirst("X-WP-Total")));
